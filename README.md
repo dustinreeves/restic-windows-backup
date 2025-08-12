@@ -39,7 +39,7 @@ Simplifies the process of installation and running daily backups.
 1. Create `secrets.ps1` file. The secrets file contains location and passwords for your restic repository.
    1. `secrets_sample.ps1` is an example of the `secrets.ps1` file. Copy or rename this file to `secrets.ps1` and edit.
    1. Restic will pick up the repo destination from the environment variables you set in this file - see this doc for more information about configuring restic repos https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
-   1. Email sending configuration is also contained with this file. The scripts are able to send email about the success/failure of each backup attempt.
+   1. Notification configuration is also contained in this file. The scripts are able to send email or ntfy.sh notifications about the success/failure of each backup attempt.
 1. Create `config.ps1` file. The config file contains the settings that control how the script runs backups, forgets snapshots, and prunes the restic repository. It's important that you configure this file to meet your needs since it will be backing up and maintaining your repository.
    1. `config_sample.ps1` contins an example configuration file. Copy or rename this file to `config.ps1` and edit to suit your needs.
    1. Add your `$BackupSources` to `config.ps1`
