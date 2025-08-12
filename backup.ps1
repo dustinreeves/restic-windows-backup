@@ -332,37 +332,13 @@ function Send-Email {
         $Action = "Backup"
     }
 
-    # set email credentials if a username and passsword are provided in configuration
-    $credentials = @{}
-    if (-not [String]::IsNullOrEmpty($ResticEmailPassword) -and -not [String]::IsNullOrEmpty($ResticEmailUsername)) {
-        $password = ConvertTo-SecureString -String $ResticEmailPassword -AsPlainText -Force
-        $credentials = @{
-            "Credential" = [System.Management.Automation.PSCredential]::new($ResticEmailUsername, $password)
-        }
-    }
-
-    # Backwards compatibility for $ResticEmailConfig port definition:
-    # $ResticEmailConfig is obsolete and should be replaced with $ResticEmailPort
-    if ($null -ne $ResticEmailConfig -and $ResticEmailConfig.ContainsKey('Port')) {
-        if ($null -eq $ResticEmailPort) {
-            $ResticEmailPort = $ResticEmailConfig['Port']
-            '[[Email]] Warning - $ResticEmailConfig is deprecated. Define $ResticEmailPort in secrets.ps1 instead.' | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog | Write-Host
-        }
-    }
-
-    # Backwards compatibility for $PSEmailServer rename to $ResticEmailServer
-    if (($null -ne $PSEmailServer) -and ($null -eq $ResticEmailServer)) {
-        $ResticEmailServer = $PSEmailServer
-        '[[Email]] Warning - $PSEmailServer is deprecated. Define $ResticEmailServer in secrets.ps1 instead.' | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog | Write-Host
-    }
-
     $status = "SUCCESS"
     $past_failure = $false
     $body = ""
     if (($null -ne $SuccessLog) -and (Test-Path $SuccessLog) -and (Get-Item $SuccessLog).Length -gt 0) {
         $body = $(Get-Content -Raw $SuccessLog)
 
-        # if previous run contained an error, send the success email confirming that the error has been resolved
+        # if previous run contained an error, send the success notification confirming that the error has been resolved
         if($Action -eq "Backup") {
             $past_failure = -not $Script:ResticStateLastBackupSuccessful
         }
@@ -384,22 +360,70 @@ function Send-Email {
     if((($status -eq "SUCCESS") -and ($SendEmailOnSuccess -ne $false)) -or ((($status -eq "ERROR") -or $past_failure) -and ($SendEmailOnError -ne $false))) {
         $subject = "$env:COMPUTERNAME Restic $Action Report [$status]"
 
-        # create a temporary error log to log errors; can't write to the same file that Send-MailMessage is reading
-        $temp_error_log = $ErrorLog + "_temp"
+        if (-not [String]::IsNullOrEmpty($ResticNtfyUrl)) {
+            # send notification via ntfy
+            $headers = @{}
+            if (-not [String]::IsNullOrEmpty($ResticNtfyToken)) {
+                $headers["Authorization"] = "Bearer $ResticNtfyToken"
+            }
 
-        $from = [MimeKit.MailboxAddress]$ResticEmailFrom;
-        $recipients = [MimeKit.InternetAddressList]::new();
-        $recipients.Add([MimeKit.InternetAddress]$ResticEmailTo);
+            $payload = @{
+                title   = $subject
+                message = $body
+            }
 
-        Send-MailKitMessage -SMTPServer $ResticEmailServer -Port $ResticEmailPort -UseSecureConnectionIfAvailable @credentials -From $from -RecipientList $recipients -Subject $subject -TextBody $body -AttachmentList $attachments 3>&1 2>> $temp_error_log | Out-File -Append $SuccessLog
+            $temp_error_log = $ErrorLog + "_temp"
+            Invoke-RestMethod -Method Post -Uri $ResticNtfyUrl -Headers $headers -Body $payload 3>&1 2>> $temp_error_log | Out-File -Append $SuccessLog
 
-        if(-not $?) {
-            "[[Email]] Sending email completed with errors" | Tee-Object -Append $temp_error_log | Tee-Object -Append $SuccessLog | Write-Host
+            if(-not $?) {
+                "[[Ntfy]] Sending notification completed with errors" | Tee-Object -Append $temp_error_log | Tee-Object -Append $SuccessLog | Write-Host
+            }
+
+            Get-Content $temp_error_log | Add-Content $ErrorLog
+            Remove-Item $temp_error_log
         }
+        else {
+            # send notification via email
+            $credentials = @{}
+            if (-not [String]::IsNullOrEmpty($ResticEmailPassword) -and -not [String]::IsNullOrEmpty($ResticEmailUsername)) {
+                $password = ConvertTo-SecureString -String $ResticEmailPassword -AsPlainText -Force
+                $credentials = @{
+                    "Credential" = [System.Management.Automation.PSCredential]::new($ResticEmailUsername, $password)
+                }
+            }
 
-        # join error logs and remove the temporary
-        Get-Content $temp_error_log | Add-Content $ErrorLog
-        Remove-Item $temp_error_log
+            # Backwards compatibility for $ResticEmailConfig port definition:
+            # $ResticEmailConfig is obsolete and should be replaced with $ResticEmailPort
+            if ($null -ne $ResticEmailConfig -and $ResticEmailConfig.ContainsKey('Port')) {
+                if ($null -eq $ResticEmailPort) {
+                    $ResticEmailPort = $ResticEmailConfig['Port']
+                    '[[Email]] Warning - $ResticEmailConfig is deprecated. Define $ResticEmailPort in secrets.ps1 instead.' | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog | Write-Host
+                }
+            }
+
+            # Backwards compatibility for $PSEmailServer rename to $ResticEmailServer
+            if (($null -ne $PSEmailServer) -and ($null -eq $ResticEmailServer)) {
+                $ResticEmailServer = $PSEmailServer
+                '[[Email]] Warning - $PSEmailServer is deprecated. Define $ResticEmailServer in secrets.ps1 instead.' | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog | Write-Host
+            }
+
+            # create a temporary error log to log errors; can't write to the same file that Send-MailMessage is reading
+            $temp_error_log = $ErrorLog + "_temp"
+
+            $from = [MimeKit.MailboxAddress]$ResticEmailFrom;
+            $recipients = [MimeKit.InternetAddressList]::new();
+            $recipients.Add([MimeKit.InternetAddress]$ResticEmailTo);
+
+            Send-MailKitMessage -SMTPServer $ResticEmailServer -Port $ResticEmailPort -UseSecureConnectionIfAvailable @credentials -From $from -RecipientList $recipients -Subject $subject -TextBody $body -AttachmentList $attachments 3>&1 2>> $temp_error_log | Out-File -Append $SuccessLog
+
+            if(-not $?) {
+                "[[Email]] Sending email completed with errors" | Tee-Object -Append $temp_error_log | Tee-Object -Append $SuccessLog | Write-Host
+            }
+
+            # join error logs and remove the temporary
+            Get-Content $temp_error_log | Add-Content $ErrorLog
+            Remove-Item $temp_error_log
+        }
     }
 }
 

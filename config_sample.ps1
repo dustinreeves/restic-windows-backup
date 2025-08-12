@@ -11,7 +11,8 @@ $BackupOnMeteredNetwork = $true
 $InternetTestAttempts = 10
 $GlobalRetryAttempts = 4
 
-# email configuration
+# notification configuration
+# these flags control both email and ntfy alerts
 $SendEmailOnSuccess = $false
 $SendEmailOnError = $true
 

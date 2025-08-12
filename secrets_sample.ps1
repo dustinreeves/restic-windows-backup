@@ -15,3 +15,7 @@ $ResticEmailTo='<DESTINATION EMAIL ADDRESS>'
 $ResticEmailFrom='<FROM EMAIL ADDRESS>'
 $ResticEmailUsername='<EMAIL LOGIN USERNAME OR EMPTY FOR NO USERNAME>'
 $ResticEmailPassword='<EMAIL PASSWORD OR EMPTY FOR NO PASSWORD>'
+
+# ntfy.sh configuration
+$ResticNtfyUrl='https://ntfy.sh/<TOPIC>'
+$ResticNtfyToken='<NTFY AUTH TOKEN OR EMPTY FOR NONE>'
