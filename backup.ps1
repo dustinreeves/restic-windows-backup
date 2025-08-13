@@ -370,10 +370,10 @@ function Send-Email {
             $payload = @{
                 title   = $subject
                 message = $body
-            }
+            } | ConvertTo-Json
 
             $temp_error_log = $ErrorLog + "_temp"
-            Invoke-RestMethod -Method Post -Uri $ResticNtfyUrl -Headers $headers -Body $payload 3>&1 2>> $temp_error_log | Out-File -Append $SuccessLog
+            Invoke-RestMethod -Method Post -Uri $ResticNtfyUrl -Headers $headers -Body $payload -ContentType "application/json" 3>&1 2>> $temp_error_log | Out-File -Append $SuccessLog
 
             if(-not $?) {
                 "[[Ntfy]] Sending notification completed with errors" | Tee-Object -Append $temp_error_log | Tee-Object -Append $SuccessLog | Write-Host
