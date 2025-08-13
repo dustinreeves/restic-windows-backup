@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+* Fix ntfy.sh notifications by sending JSON payload to avoid URL-encoded message contents.
+
 ## [1.8](https://github.com/kmwoley/restic-windows-backup/tree/1.8) (2025-02-20)
 [Full Changelog](https://github.com/kmwoley/restic-windows-backup/compare/1.7.1...1.8)
 
